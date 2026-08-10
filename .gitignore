@@ -72,3 +72,16 @@ aviation_backup_working_dashboard/
 *.tmp
 *.temp
 *.swp
+# ==========================================================
+# Big Data runtime artifacts
+# ==========================================================
+
+spark/metastore_db/
+spark/derby.log
+kafka/producer_state.json
+
+# Spark / Hadoop runtime
+spark_checkpoints/
+checkpoints/
+warehouse/
+.parquet/
