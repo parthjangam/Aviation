@@ -6,8 +6,6 @@ import {
   Card,
   CardContent,
   Grid,
-  Skeleton,
-  Stack,
   Typography,
 } from '@mui/material'
 
@@ -26,12 +24,14 @@ import ErrorState from '../components/ErrorState'
 import EmptyState from '../components/EmptyState'
 import LoadingCard from '../components/LoadingCard'
 import PageHeader from '../components/PageHeader'
+
 import { getDashboard } from '../services/dashboardService'
 import {
   getAirlineDelay,
   getHourlyDelay,
   getTopRoutes,
 } from '../services/analyticsService'
+
 import { formatAirline, formatMonth } from '../services/metadataService'
 
 function Dashboard() {
@@ -39,43 +39,86 @@ function Dashboard() {
   const [airlineData, setAirlineData] = useState([])
   const [hourlyData, setHourlyData] = useState([])
   const [routeData, setRouteData] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let mounted = true
+    let firstLoad = true
+    let refreshInProgress = false
+
     async function loadDashboard() {
-      setLoading(true)
-      setError('')
-
-      const [dashboardResult, airlineResult, hourlyResult, routeResult] = await Promise.allSettled([
-        getDashboard(),
-        getAirlineDelay(),
-        getHourlyDelay(),
-        getTopRoutes(),
-      ])
-
-      if (dashboardResult.status === 'fulfilled') {
-        setDashboard(dashboardResult.value)
-      } else {
-        setError('Unable to connect to the Aviation Analytics API.')
+      if (refreshInProgress) {
+        return
       }
 
-      if (airlineResult.status === 'fulfilled') {
-        setAirlineData(airlineResult.value)
+      refreshInProgress = true
+
+      if (firstLoad) {
+        setLoading(true)
+        setError('')
       }
 
-      if (hourlyResult.status === 'fulfilled') {
-        setHourlyData(hourlyResult.value)
-      }
+      try {
+        const [
+          dashboardResult,
+          airlineResult,
+          hourlyResult,
+          routeResult,
+        ] = await Promise.allSettled([
+          getDashboard(),
+          getAirlineDelay(),
+          getHourlyDelay(),
+          getTopRoutes(),
+        ])
 
-      if (routeResult.status === 'fulfilled') {
-        setRouteData(routeResult.value)
-      }
+        if (!mounted) {
+          return
+        }
 
-      setLoading(false)
+        if (dashboardResult.status === 'fulfilled') {
+          setDashboard(dashboardResult.value)
+          setError('')
+        } else if (firstLoad) {
+          setError('Unable to connect to the Aviation Analytics API.')
+        }
+
+        if (airlineResult.status === 'fulfilled') {
+          setAirlineData(airlineResult.value)
+        }
+
+        if (hourlyResult.status === 'fulfilled') {
+          setHourlyData(hourlyResult.value)
+        }
+
+        if (routeResult.status === 'fulfilled') {
+          setRouteData(routeResult.value)
+        }
+      } catch (err) {
+        if (mounted && firstLoad) {
+          setError('Unable to connect to the Aviation Analytics API.')
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false)
+        }
+
+        refreshInProgress = false
+        firstLoad = false
+      }
     }
 
     loadDashboard()
+
+    const refreshInterval = setInterval(() => {
+      loadDashboard()
+    }, 10000)
+
+    return () => {
+      mounted = false
+      clearInterval(refreshInterval)
+    }
   }, [])
 
   const insight = useMemo(() => {
@@ -83,8 +126,13 @@ function Dashboard() {
       return null
     }
 
-    const worstMonth = [...(dashboard?.monthly || [])].sort((a, b) => b.average_delay - a.average_delay)[0]
-    const worstAirline = [...airlineData].sort((a, b) => b.average_delay - a.average_delay)[0]
+    const worstMonth = [...(dashboard?.monthly || [])].sort(
+      (a, b) => b.average_delay - a.average_delay
+    )[0]
+
+    const worstAirline = [...airlineData].sort(
+      (a, b) => b.average_delay - a.average_delay
+    )[0]
 
     if (!worstMonth && !worstAirline) {
       return null
@@ -126,7 +174,11 @@ function Dashboard() {
           title="Aviation Dashboard"
           description="Monitor flight delays, predictions and aviation analytics."
         />
-        <ErrorState title="Dashboard unavailable" message={error} />
+
+        <ErrorState
+          title="Dashboard unavailable"
+          message={error}
+        />
       </Box>
     )
   }
@@ -176,16 +228,38 @@ function Dashboard() {
           </Grid>
         </Grid>
       ) : (
-        <EmptyState title="No dashboard summary available." message="The backend did not return a summary payload for this view." />
+        <EmptyState
+          title="No dashboard summary available."
+          message="The backend did not return a summary payload for this view."
+        />
       )}
 
       {insight && (
-        <Card elevation={0} sx={{ mt: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Card
+          elevation={0}
+          sx={{
+            mt: 3,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <CardContent
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
             <InsightsIcon color="primary" />
+
             <Typography variant="body2" color="text.secondary">
-              {insight.month ? `${insight.month} recorded the highest observed monthly average delay.` : ''}{' '}
-              {insight.airline ? `${insight.airline} has the highest average delay in the current dataset.` : ''}
+              {insight.month
+                ? `${insight.month} recorded the highest observed monthly average delay.`
+                : ''}{' '}
+              {insight.airline
+                ? `${insight.airline} has the highest average delay in the current dataset.`
+                : ''}
             </Typography>
           </CardContent>
         </Card>
@@ -193,25 +267,53 @@ function Dashboard() {
 
       <Box sx={{ mt: 4 }}>
         <ChartCard title="Monthly Average Delay">
-          {dashboard?.monthly?.length ? <MonthlyDelayChart data={dashboard.monthly} /> : <EmptyState title="No monthly data available." message="The analytics service did not return any monthly delay values." />}
+          {dashboard?.monthly?.length ? (
+            <MonthlyDelayChart data={dashboard.monthly} />
+          ) : (
+            <EmptyState
+              title="No monthly data available."
+              message="The analytics service did not return any monthly delay values."
+            />
+          )}
         </ChartCard>
       </Box>
 
       <Box sx={{ mt: 4 }}>
         <ChartCard title="Airline Average Delay">
-          {airlineData.length ? <AirlineDelayChart data={airlineData} /> : <EmptyState title="No airline data available." message="There are currently no airline delay measurements to display." />}
+          {airlineData.length ? (
+            <AirlineDelayChart data={airlineData} />
+          ) : (
+            <EmptyState
+              title="No airline data available."
+              message="There are currently no airline delay measurements to display."
+            />
+          )}
         </ChartCard>
       </Box>
 
       <Box sx={{ mt: 4 }}>
         <ChartCard title="Hourly Average Delay">
-          {hourlyData.length ? <HourlyDelayChart data={hourlyData} /> : <EmptyState title="No hourly data available." message="The hourly delay feed is empty right now." />}
+          {hourlyData.length ? (
+            <HourlyDelayChart data={hourlyData} />
+          ) : (
+            <EmptyState
+              title="No hourly data available."
+              message="The hourly delay feed is empty right now."
+            />
+          )}
         </ChartCard>
       </Box>
 
       <Box sx={{ mt: 4 }}>
         <ChartCard title="Top Delayed Routes">
-          {routeData.length ? <RouteDelayChart data={routeData} /> : <EmptyState title="No route data available." message="No delayed routes were returned by the backend." />}
+          {routeData.length ? (
+            <RouteDelayChart data={routeData} />
+          ) : (
+            <EmptyState
+              title="No route data available."
+              message="No delayed routes were returned by the backend."
+            />
+          )}
         </ChartCard>
       </Box>
     </Box>

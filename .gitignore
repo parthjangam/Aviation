@@ -85,3 +85,14 @@ spark_checkpoints/
 checkpoints/
 warehouse/
 .parquet/
+
+# Runtime process files
+runtime/
+
+# ==========================================================
+# Local simulation / runtime data
+# ==========================================================
+
+datasets/simulation/*.csv
+producer_state.json
+metastore_db/
