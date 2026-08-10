@@ -1,6 +1,10 @@
-import joblib
 from pathlib import Path
 from typing import Any
+
+try:
+    import joblib
+except ModuleNotFoundError:  # pragma: no cover - exercised in minimal environments
+    joblib = None
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 MODEL_DIR = BASE_DIR / "models"
@@ -8,10 +12,13 @@ MODEL_DIR = BASE_DIR / "models"
 # Attempt to load the serialized label encoders. If the artifact is
 # missing (common in dev checkouts), fall back to empty maps so the
 # application stays up and the frontend can gracefully show raw ids.
-try:
-    label_encoders: dict[str, Any] = joblib.load(MODEL_DIR / "label_encoders.pkl")
-except Exception:
-    label_encoders = {}
+if joblib is None:
+    label_encoders: dict[str, Any] = {}
+else:
+    try:
+        label_encoders: dict[str, Any] = joblib.load(MODEL_DIR / "label_encoders.pkl")
+    except Exception:
+        label_encoders = {}
 
 
 # Build lookup dictionaries when encoders are available
