@@ -6,7 +6,7 @@ import pandas as pd
 # ==========================================================
 
 DATABASE_URL = (
-    "postgresql://aviation:aviation@localhost:5432/aviation"
+    "postgresql://aviation:aviation@localhost:5433/aviation"
 )
 
 engine = create_engine(DATABASE_URL)
